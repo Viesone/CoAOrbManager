@@ -59,6 +59,10 @@ local function HideFrame(frame)
     hiddenFrames[name] = frame
 end
 
+-- ============================================
+-- Hide ALL CoA Frames (except the orb)
+-- Now includes Button 6 for max level!
+-- ============================================
 local function HideCoAFrames()
     -- 1. Hide the main action bar frame and detach orb
     local coa = _G["CoAMultiCastActionBarFrame"]
@@ -88,7 +92,7 @@ local function HideCoAFrames()
         end
     end
     
-    -- 3. Hide all action buttons (scan up to 20)
+    -- 3. Hide ALL action buttons (1-20 to be safe, including button 6)
     for i = 1, 20 do
         local btn = _G["CoAMultiCastActionBarFramePoolFrameCoAMultiCastActionButtonTemplate"..i]
         if btn then
