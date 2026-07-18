@@ -43,10 +43,24 @@ local function ForceSaveSettings()
 end
 
 -- ============================================
--- Hide ALL CoA Frames (except the orb)
+-- Aggressive Frame Hiding
 -- ============================================
+local hiddenFrames = {}
+
+local function HideFrame(frame)
+    if not frame then return end
+    frame:Hide()
+    -- Hook OnShow to keep it hidden
+    frame:SetScript("OnShow", function(self)
+        self:Hide()
+    end)
+    -- Store reference so we can unhide if needed
+    local name = frame:GetName() or "unnamed"
+    hiddenFrames[name] = frame
+end
+
 local function HideCoAFrames()
-    -- 1. Hide the main action bar frame
+    -- 1. Hide the main action bar frame and detach orb
     local coa = _G["CoAMultiCastActionBarFrame"]
     if coa then
         -- Detach the orb first
@@ -56,48 +70,78 @@ local function HideCoAFrames()
                 child:SetParent(UIParent)
             end
         end
-        coa:Hide()
+        HideFrame(coa)
     end
     
-    -- 2. Hide the flyout frame
-    local flyout = _G["CoAMultiCastActionBarFrameFlyoutFrame"]
-    if flyout then
-        flyout:Hide()
+    -- 2. Hide specific known frames
+    local framesToHide = {
+        "CoAMultiCastActionBarFrameFlyoutFrame",
+        "CoAMultiCastActionBarFrameFlyoutFrameCloseButton",
+        "CoAMultiCastActionBarFrameFlyoutFrameOpenButton",
+        "CoAMultiCastActionBarFramePoolFrame",
+    }
+    
+    for _, name in ipairs(framesToHide) do
+        local f = _G[name]
+        if f then
+            HideFrame(f)
+        end
     end
     
-    -- 3. Hide the flyout close button
-    local closeBtn = _G["CoAMultiCastActionBarFrameFlyoutFrameCloseButton"]
-    if closeBtn then
-        closeBtn:Hide()
+    -- 3. Hide all action buttons (scan up to 20)
+    for i = 1, 20 do
+        local btn = _G["CoAMultiCastActionBarFramePoolFrameCoAMultiCastActionButtonTemplate"..i]
+        if btn then
+            HideFrame(btn)
+        end
     end
     
-    -- 4. Hide the flyout open button
-    local openBtn = _G["CoAMultiCastActionBarFrameFlyoutFrameOpenButton"]
-    if openBtn then
-        openBtn:Hide()
-    end
-    
-    -- 5. Hide the pool frame (contains the action buttons)
+    -- 4. Hide any children of the pool frame
     local pool = _G["CoAMultiCastActionBarFramePoolFrame"]
     if pool then
-        pool:Hide()
-    end
-    
-    -- 6. Hide individual action buttons (1-5)
-    for i = 1, 5 do
-        local btn = _G["CoAMultiCastActionBarFrameButton"..i]
-        if btn then
-            btn:Hide()
+        for i = 1, pool:GetNumChildren() do
+            local child = select(i, pool:GetChildren())
+            if child then
+                HideFrame(child)
+            end
         end
     end
     
-    -- 7. Also try to hide any buttons with the template name
-    for i = 1, 5 do
-        local btn = _G["CoAMultiCastActionButtonTemplate"..i]
-        if btn then
-            btn:Hide()
+    -- 5. Scan the entire UI for any frame containing CoA-related patterns
+    local function scanForFrames(parent, depth)
+        if depth > 5 then return end
+        for i = 1, parent:GetNumChildren() do
+            local child = select(i, parent:GetChildren())
+            if child then
+                local name = child:GetName()
+                if name then
+                    -- Check if it's a CoA action button or related frame (but not the orb)
+                    if (string.find(name, "ActionButtonTemplate") or 
+                       string.find(name, "MultiCastAction") or
+                       string.find(name, "CoAMultiCast")) and 
+                       not string.find(name, "Orb") then
+                        HideFrame(child)
+                    end
+                end
+                scanForFrames(child, depth + 1)
+            end
         end
     end
+    
+    -- Scan the entire UI
+    scanForFrames(UIParent, 0)
+end
+
+-- Function to show all frames (for debugging)
+local function ShowAllCoAFrames()
+    for name, frame in pairs(hiddenFrames) do
+        if frame then
+            frame:SetScript("OnShow", nil)
+            frame:Show()
+        end
+    end
+    hiddenFrames = {}
+    print("All CoA frames shown!")
 end
 
 -- ============================================
@@ -171,6 +215,7 @@ local function DelayedSetup()
     C_Timer.After(0.5, SetupOrb)
     C_Timer.After(1.5, SetupOrb)
     C_Timer.After(3, SetupOrb)
+    C_Timer.After(5, SetupOrb)  -- Extra attempt
 end
 
 local eventFrame = CreateFrame("Frame")
@@ -300,6 +345,24 @@ SlashCmdList["ORB"] = function(msg)
         end
         ForceSaveSettings()
         
+    elseif msg == "findframes" then
+        print("=== Finding CoA Frames ===")
+        local function scan(parent, depth)
+            if depth > 3 then return end
+            for i = 1, parent:GetNumChildren() do
+                local child = select(i, parent:GetChildren())
+                if child then
+                    local name = child:GetName()
+                    if name and string.find(name, "CoA") then
+                        print(name.." (visible: "..tostring(child:IsVisible())..")")
+                    end
+                    scan(child, depth + 1)
+                end
+            end
+        end
+        scan(UIParent, 0)
+        print("=== End of list ===")
+        
     elseif msg == "debug" then
         print("=== Debug Info ===")
         print("CoAOrbManagerDB contents:")
@@ -312,26 +375,14 @@ SlashCmdList["ORB"] = function(msg)
             local point, _, _, xOffset, yOffset = orb:GetPoint(1)
             print("Orb anchor: "..(point or "nil"))
             print("Orb offset: "..(xOffset or "nil")..", "..(yOffset or "nil"))
-            print("UIParent size: "..UIParent:GetWidth().."x"..UIParent:GetHeight())
         else
             print("Orb exists: NO")
         end
         
-        -- Check if all frames are hidden
-        print("Checking hidden frames:")
-        local framesToCheck = {
-            "CoAMultiCastActionBarFrame",
-            "CoAMultiCastActionBarFrameFlyoutFrame",
-            "CoAMultiCastActionBarFrameFlyoutFrameCloseButton",
-            "CoAMultiCastActionBarFrameFlyoutFrameOpenButton",
-            "CoAMultiCastActionBarFramePoolFrame"
-        }
-        for _, name in ipairs(framesToCheck) do
-            local f = _G[name]
-            if f then
-                print("  "..name..": "..(f:IsVisible() and "VISIBLE" or "HIDDEN"))
-            else
-                print("  "..name..": NOT FOUND")
+        print("Hidden frames count: "..#hiddenFrames)
+        for name, frame in pairs(hiddenFrames) do
+            if frame then
+                print("  "..name..": "..(frame:IsVisible() and "VISIBLE" or "HIDDEN"))
             end
         end
         
@@ -348,27 +399,35 @@ SlashCmdList["ORB"] = function(msg)
         print("All settings reset to defaults!")
         ForceSaveSettings()
         
-    -- New: Show all CoA frames (for debugging)
     elseif msg == "showall" then
-        local framesToShow = {
-            "CoAMultiCastActionBarFrame",
-            "CoAMultiCastActionBarFrameFlyoutFrame",
-            "CoAMultiCastActionBarFrameFlyoutFrameCloseButton",
-            "CoAMultiCastActionBarFrameFlyoutFrameOpenButton",
-            "CoAMultiCastActionBarFramePoolFrame"
-        }
-        for _, name in ipairs(framesToShow) do
-            local f = _G[name]
-            if f then
-                f:Show()
-                print("Showed: "..name)
-            end
-        end
-        print("All CoA frames shown!")
+        ShowAllCoAFrames()
         
     elseif msg == "hideall" then
         HideCoAFrames()
         print("All CoA frames hidden!")
+        
+    elseif msg == "forcehide" then
+        -- Force hide everything again
+        HideCoAFrames()
+        print("Forced hide all CoA frames!")
+        -- Also try to find any visible CoA frames and hide them
+        local function scan(parent, depth)
+            if depth > 3 then return end
+            for i = 1, parent:GetNumChildren() do
+                local child = select(i, parent:GetChildren())
+                if child then
+                    local name = child:GetName()
+                    if name and string.find(name, "CoA") and not string.find(name, "Orb") then
+                        if child:IsVisible() then
+                            HideFrame(child)
+                            print("Found and hid: "..name)
+                        end
+                    end
+                    scan(child, depth + 1)
+                end
+            end
+        end
+        scan(UIParent, 0)
         
     elseif msg == "" or msg == "help" then
         print("=== CoA Orb Commands ===")
@@ -383,9 +442,11 @@ SlashCmdList["ORB"] = function(msg)
         print("/orb show      - Show the orb")
         print("/orb status    - Show orb info")
         print("/orb save      - Manually save settings")
+        print("/orb findframes - Find all CoA frames")
         print("/orb debug     - Show debug information")
         print("/orb hideall   - Hide all CoA frames")
         print("/orb showall   - Show all CoA frames (debug)")
+        print("/orb forcehide - Force hide all visible CoA frames")
         print("/orb resetall  - Reset ALL settings to defaults")
         print("/orb help      - Show this menu")
     else
