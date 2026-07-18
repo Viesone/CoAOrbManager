@@ -1,0 +1,8 @@
+## Interface: 30300
+## Title: CoA Orb Manager
+## Notes: Hides CoA action bar, keeps orb movable
+## Author: Vies / Viesone
+## Version: 1.0
+## SavedVariables: CoAOrbManagerDB
+
+CoAOrbManager.lua
