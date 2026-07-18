@@ -1,3 +1,4 @@
+<img width="797" height="139" alt="{5200FDC5-FC20-483C-B19F-4159E0504699}" src="https://github.com/user-attachments/assets/4543c87a-2962-4c7b-94c2-5e153b14a2d7" />
 # CoA Orb Manager
 
 Hides Necromancers Pet action bar frames while keeping the orb in WoW Ascension / Conquest of Azeroth
