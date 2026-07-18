@@ -41,8 +41,8 @@ Hides Necromancers Pet action bar frames while keeping the orb in WoW Ascension 
 3. Restart the game
 4. Use `/orb` for commands
 
-## 100% AI code :-)
-
 ## Support
 
 For issues or suggestions, please open an issue on GitHub.
+
+## 100% AI code :-)
